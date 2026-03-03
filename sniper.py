@@ -13,8 +13,45 @@ except ImportError:
 
 class CSFloatSniper:
     def __init__(self, config_path: str = "config.json"):
-        with open(config_path, 'r') as f:
-            self.config = json.load(f)
+        # Try to load from environment variables first (for cloud deployment)
+        if os.getenv('CSFLOAT_API_KEY'):
+            print("Loading configuration from environment variables...")
+            self.config = {
+                'api_key': os.getenv('CSFLOAT_API_KEY'),
+                'check_interval': int(os.getenv('CHECK_INTERVAL', '20')),
+                'filters': {
+                    'sort_by': os.getenv('SORT_BY', 'highest_discount'),
+                    'type': os.getenv('TYPE', 'buy_now'),
+                    'max_price': int(os.getenv('MAX_PRICE', '10000')),
+                    'limit': int(os.getenv('LIMIT', '50'))
+                },
+                'criteria': {
+                    'min_discount_percent': int(os.getenv('MIN_DISCOUNT', '18')),
+                    'market_hash_names': [],
+                    'min_float': None,
+                    'max_float': None,
+                    'category': 0
+                },
+                'notifications': {
+                    'desktop': os.getenv('DESKTOP_NOTIFICATIONS', 'false').lower() == 'true',
+                    'discord': os.getenv('DISCORD_NOTIFICATIONS', 'true').lower() == 'true',
+                    'log_file': 'snipes.log'
+                },
+                'discord': {
+                    'webhook_url': os.getenv('DISCORD_WEBHOOK_URL', '')
+                }
+            }
+        elif os.path.exists(config_path):
+            # Load from config file (local development)
+            print("Loading configuration from config.json...")
+            with open(config_path, 'r') as f:
+                self.config = json.load(f)
+        else:
+            raise FileNotFoundError(
+                "No configuration found! Either:\n"
+                "1. Create config.json locally, OR\n"
+                "2. Set environment variables: CSFLOAT_API_KEY, DISCORD_WEBHOOK_URL, etc."
+            )
         
         self.api_key = self.config['api_key']
         self.base_url = "https://csfloat.com/api/v1"
