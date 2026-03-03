@@ -1,0 +1,25 @@
+{
+  "api_key": "YOUR_API_KEY_HERE",
+  "check_interval": 20,
+  "filters": {
+    "sort_by": "highest_discount",
+    "type": "buy_now",
+    "max_price": 10000,
+    "limit": 50
+  },
+  "criteria": {
+    "min_discount_percent": 18,
+    "market_hash_names": [],
+    "min_float": null,
+    "max_float": null,
+    "category": 0
+  },
+  "notifications": {
+    "desktop": false,
+    "discord": true,
+    "log_file": "snipes.log"
+  },
+  "discord": {
+    "webhook_url": "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL"
+  }
+}
