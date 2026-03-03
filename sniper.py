@@ -114,10 +114,14 @@ class CSFloatSniper:
         params.setdefault('limit', 50)
         params.setdefault('sort_by', 'most_recent')
         
+        # Add headers to avoid Cloudflare blocking
+        headers = self.headers.copy()
+        headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        
         try:
             # Try with API key first if available
-            if self.headers:
-                response = requests.get(url, headers=self.headers, params=params)
+            if headers:
+                response = requests.get(url, headers=headers, params=params)
             else:
                 # Try without auth (public endpoint)
                 response = requests.get(url, params=params)
@@ -148,7 +152,7 @@ class CSFloatSniper:
                 return None
             print(f"Error fetching listings: {e}")
             if hasattr(e, 'response') and e.response is not None:
-                print(f"Response: {e.response.text}")
+                print(f"Response: {e.response.text[:500]}")  # Limit output
             return []
         except requests.exceptions.RequestException as e:
             print(f"Error fetching listings: {e}")
