@@ -116,16 +116,21 @@ class CSFloatSniper:
         
         # Add headers to avoid Cloudflare blocking
         headers = self.headers.copy()
-        headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Referer': 'https://csfloat.com/',
+            'Origin': 'https://csfloat.com',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin'
+        })
         
         try:
-            # Try with API key first if available
-            if headers:
-                response = requests.get(url, headers=headers, params=params)
-            else:
-                # Try without auth (public endpoint)
-                response = requests.get(url, params=params)
-            
+            response = requests.get(url, headers=headers, params=params)
             response.raise_for_status()
             data = response.json()
             
@@ -265,6 +270,15 @@ class CSFloatSniper:
             response = requests.post(webhook_url, json=payload)
             response.raise_for_status()
             print("💬 Discord notification sent")
+            
+            # Rate limit protection: wait 1 second between Discord messages
+            time.sleep(1)
+            
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                print("⚠️  Discord rate limited, skipping notification")
+            else:
+                print(f"Failed to send Discord notification: {e}")
         except Exception as e:
             print(f"Failed to send Discord notification: {e}")
     
@@ -385,6 +399,7 @@ class CSFloatSniper:
                 
                 new_count = 0
                 snipe_count = 0
+                max_snipes_per_check = 5  # Limit Discord spam
                 
                 for listing in listings:
                     listing_id = listing.get('id')
@@ -401,13 +416,35 @@ class CSFloatSniper:
                     
                     # Check if meets snipe criteria
                     if self.meets_criteria(listing):
-                        self.log_snipe(listing)
                         snipe_count += 1
+                        # Only send notifications for first few snipes to avoid spam
+                        if snipe_count <= max_snipes_per_check:
+                            self.log_snipe(listing)
+                        else:
+                            # Just log to file without notifications
+                            item = listing.get('item', {})
+                            discount = self.calculate_discount(listing)
+                            float_value = item.get('float_value')
+                            log_entry = {
+                                'timestamp': datetime.now().isoformat(),
+                                'listing_id': listing.get('id'),
+                                'item_name': item.get('market_hash_name'),
+                                'price': listing.get('price') / 100,
+                                'float': float_value if float_value is not None else 'N/A',
+                                'discount_percent': discount,
+                                'url': f"https://csfloat.com/item/{listing.get('id')}"
+                            }
+                            log_file = self.config['notifications'].get('log_file', 'snipes.log')
+                            with open(log_file, 'a') as f:
+                                f.write(json.dumps(log_entry) + '\n')
                 
                 # Save seen listings after each check
                 if new_count > 0:
                     self._save_seen_listings()
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Checked {new_count} new listings, found {snipe_count} snipes")
+                    if snipe_count > max_snipes_per_check:
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Checked {new_count} new listings, found {snipe_count} snipes (notified first {max_snipes_per_check}, rest logged)")
+                    else:
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Checked {new_count} new listings, found {snipe_count} snipes")
                 else:
                     # Show periodic status even when no new listings
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] No new listings (checked {len(listings)} total, all previously seen)")
